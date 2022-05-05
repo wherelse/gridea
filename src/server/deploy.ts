@@ -1,11 +1,14 @@
+import simpleGit, { SimpleGit } from 'simple-git/promise'
 import fs from 'fs'
 import moment from 'moment'
 // @ts-ignore
-import * as git from 'isomorphic-git/dist/for-node/isomorphic-git'
+// import * as git from 'isomorphic-git/dist/for-node/isomorphic-git'
 import Model from './model'
 
 export default class Deploy extends Model {
   outputDir: string = `${this.appDir}/output`
+
+  git: SimpleGit
 
   remoteUrl = ''
 
@@ -19,12 +22,8 @@ export default class Deploy extends Model {
       github: 'github.com',
       coding: 'e.coding.net',
     } as any)[setting.platform || 'github']
-    const preUrl = ({
-      github: `${setting.username}:${setting.token}`,
-      coding: `${setting.tokenUsername}:${setting.token}`,
-    } as any)[setting.platform || 'github']
-
-    this.remoteUrl = `https://${preUrl}@${this.platformAddress}/${setting.username}/${setting.repository}.git`
+    this.remoteUrl = `https://${setting.username}:${setting.token}@${this.platformAddress}/${setting.username}/${setting.repository}.git`
+    this.git = simpleGit(this.outputDir)
   }
 
   /**
@@ -39,8 +38,7 @@ export default class Deploy extends Model {
       const { setting } = this.db
       let isRepo = false
       try {
-        await git.currentBranch({ fs, dir: this.outputDir })
-        isRepo = true
+        isRepo = await this.git.checkIsRepo()
       } catch (e) {
         console.log('Not a repo', e.message)
       }
@@ -52,30 +50,16 @@ export default class Deploy extends Model {
         }
       }
       if (!isRepo) {
-        await git.init({ fs, dir: this.outputDir })
-        await git.config({
-          fs,
-          dir: this.outputDir,
-          path: 'user.name',
-          value: setting.username,
-        })
-        await git.config({
-          fs,
-          dir: this.outputDir,
-          path: 'user.email',
-          value: setting.email,
-        })
+        await this.git.init()
+        await this.git.addConfig('user.name', setting.username)
+        await this.git.addConfig('user.email', setting.email)
+        await this.git.add('./*')
+        await this.git.commit('first commit')
+        await this.git.addRemote('origin', this.remoteUrl)
       }
 
-      await git.addRemote({
-        fs, dir: this.outputDir, remote: 'origin', url: this.remoteUrl, force: true,
-      })
-      const info = await git.getRemoteInfo({
-        core: 'default',
-        url: this.remoteUrl,
-      })
-      console.log('info', info)
-      result.message = info
+      await this.git.raw(['remote', 'set-url', 'origin', this.remoteUrl])
+      const data = await this.git.listRemote([])
     } catch (e) {
       console.log('Test Remote Error: ', e.message)
       result.success = false
@@ -91,61 +75,33 @@ export default class Deploy extends Model {
       message: '',
       localBranchs: {},
     }
-    let isRepo = false
-    try {
-      await git.currentBranch({ fs, dir: this.outputDir })
-      isRepo = true
-    } catch (e) {
-      console.log('Not a repo', e.message)
-    }
+    const isRepo = await this.git.checkIsRepo()
+    console.log(isRepo)
     if (isRepo) {
       result = await this.commonPush()
     } else {
-      // result = await this.firstPush()
+      result = await this.firstPush()
     }
     return result
   }
 
   async firstPush() {
     const { setting } = this.db
-    const localBranchs = {}
+    let localBranchs = {}
     console.log('first push')
 
     try {
-      await git.init({ fs, dir: this.outputDir })
-      await git.config({
-        fs,
-        dir: this.outputDir,
-        path: 'user.name',
-        value: setting.username,
-      })
-      await git.config({
-        fs,
-        dir: this.outputDir,
-        path: 'user.email',
-        value: setting.email,
-      })
-      await git.add({ fs, dir: this.outputDir, filepath: '.' })
-      await git.commit({
-        fs,
-        dir: this.outputDir,
-        message: `update from gridea: ${moment().format('YYYY-MM-DD HH:mm:ss')}`,
-      })
-      await git.addRemote({
-        fs, dir: this.outputDir, remote: 'origin', url: this.remoteUrl, force: true,
-      })
-
-      await this.checkCurrentBranch()
-      const pushRes = await git.push({
-        fs,
-        dir: this.outputDir,
-        remote: 'origin',
-        ref: setting.branch,
-        force: true,
-      })
+      await this.git.init()
+      await this.git.addConfig('user.name', setting.username)
+      await this.git.addConfig('user.email', setting.email)
+      await this.git.add('./*')
+      await this.git.commit('first commit')
+      await this.git.addRemote('origin', this.remoteUrl)
+      localBranchs = await this.checkCurrentBranch()
+      await this.git.push('origin', setting.branch, { '--force': true })
       return {
         success: true,
-        data: pushRes,
+        data: localBranchs,
         message: '',
         localBranchs,
       }
@@ -163,36 +119,24 @@ export default class Deploy extends Model {
   async commonPush() {
     console.log('common push')
     const { setting } = this.db
-    const localBranchs = {}
+    let localBranchs = {}
     try {
-      const statusSummary = await git.status({ fs, dir: this.outputDir, filepath: '.' })
-      console.log('statusSummary', statusSummary)
-      await git.addRemote({
-        fs, dir: this.outputDir, remote: 'origin', url: this.remoteUrl, force: true,
-      })
+      const statusSummary = await this.git.status()
+      console.log(statusSummary)
+      await this.git.raw(['remote', 'set-url', 'origin', this.remoteUrl])
 
-      if (statusSummary !== 'unmodified') {
-        await git.add({ fs, dir: this.outputDir, filepath: '.' })
-        await git.commit({
-          fs,
-          dir: this.outputDir,
-          message: `update from gridea: ${moment().format('YYYY-MM-DD HH:mm:ss')}`,
-        })
+      if (statusSummary.modified.length > 0 || statusSummary.not_added.length > 0) {
+        await this.git.add('./*')
+        await this.git.commit(`update from gridea: ${moment().format('YYYY-MM-DD HH:mm:ss')}`)
+        localBranchs = await this.checkCurrentBranch()
+        await this.git.push('origin', this.db.setting.branch, { '--force': true })
+      } else {
+        await this.checkCurrentBranch()
+        await this.git.push('origin', this.db.setting.branch, { '--force': true })
       }
-
-      await this.checkCurrentBranch()
-
-      const pushRes = await git.push({
-        fs,
-        dir: this.outputDir,
-        remote: 'origin',
-        ref: setting.branch,
-        force: true,
-      })
-      console.log('pushRes', pushRes)
       return {
         success: true,
-        data: pushRes,
+        data: localBranchs,
         message: '',
         localBranchs,
       }
@@ -208,20 +152,34 @@ export default class Deploy extends Model {
   }
 
   /**
-   * Check whether the branch needs to be switched,
-   * FIXME: if branch is change, then the fist push is not work. so need to push again.
+   * Check whether the branch needs to be switched
    */
   async checkCurrentBranch() {
     const { setting } = this.db
-    const currentBranch = await git.currentBranch({ fs, dir: this.outputDir, fullname: false })
-    const localBranches = await git.listBranches({ fs, dir: this.outputDir })
+    const currentBranch = (await this.git.revparse(['--abbrev-ref', 'HEAD']) || 'master').replace(/\n/g, '')
+    let hasNewBranch = true
+    console.log(currentBranch)
+
+    const list = await this.git.branch([])
+    list.all.forEach((item: string) => {
+      if (item === setting.branch) {
+        hasNewBranch = false
+      }
+    })
 
     if (currentBranch !== setting.branch) {
-      if (!localBranches.includes(setting.branch)) {
-        await git.branch({ fs, dir: this.outputDir, ref: setting.branch })
+      if (hasNewBranch) {
+        await this.git.checkout(['-b', setting.branch])
+      } else {
+        try {
+          await this.git.deleteLocalBranch(setting.branch)
+        } catch (e) {
+          console.log(e)
+        } finally {
+          await this.git.checkout(['-b', setting.branch])
+        }
       }
-
-      await git.fastCheckout({ fs, dir: this.outputDir, ref: setting.branch })
     }
+    return {}
   }
 }

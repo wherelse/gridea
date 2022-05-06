@@ -17,9 +17,11 @@ export default class DeployEvents {
     ipcMain.removeAllListeners('remote-detected')
 
     ipcMain.on('site-publish', async (event: IpcMainEvent, params: any) => {
+      console.log(platform)
       const client = ({
         'github': deploy,
         'coding': deploy,
+        'gitee': deploy,
         'sftp': sftp,
       } as any)[platform]
       
@@ -36,6 +38,7 @@ export default class DeployEvents {
       const client = ({
         'github': deploy,
         'coding': deploy,
+        'gitee': deploy,
         'sftp': sftp,
       } as any)[platform]
 

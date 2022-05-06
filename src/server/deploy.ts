@@ -21,6 +21,7 @@ export default class Deploy extends Model {
     this.platformAddress = ({
       github: 'github.com',
       coding: 'e.coding.net',
+      gitee: 'gitee.com',
     } as any)[setting.platform || 'github']
     this.remoteUrl = `https://${setting.username}:${setting.token}@${this.platformAddress}/${setting.username}/${setting.repository}.git`
     this.git = simpleGit(this.outputDir)

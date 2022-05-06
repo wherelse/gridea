@@ -1,5 +1,5 @@
 export interface ISetting {
-  platform: 'github' | 'coding' | 'sftp'
+  platform: 'github' | 'coding' | 'gitee' | 'sftp'
   domain: string
   repository: string
   branch: string

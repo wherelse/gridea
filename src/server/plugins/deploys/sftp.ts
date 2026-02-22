@@ -2,7 +2,7 @@ import * as fse from 'fs-extra'
 // import * as fs from 'fs'
 import path from 'path'
 import SftpClient from 'ssh2-sftp-client'
-import NodeSsh from 'node-ssh'
+import { NodeSSH } from 'node-ssh'
 import normalizePath from 'normalize-path'
 import Model from '../../model'
 
@@ -91,7 +91,7 @@ export default class SftpDeploy extends Model {
       message: '',
     }
 
-    const client = new NodeSsh()
+    const client = new NodeSSH()
 
     const { setting } = this.db
 

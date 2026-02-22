@@ -1,4 +1,4 @@
-import simpleGit, { SimpleGit } from 'simple-git/promise'
+import simpleGit, { SimpleGit } from 'simple-git'
 import fs from 'fs'
 import moment from 'moment'
 // @ts-ignore

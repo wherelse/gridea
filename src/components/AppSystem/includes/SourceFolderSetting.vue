@@ -16,8 +16,9 @@
 
 <script lang="ts">
 import {
-  ipcRenderer, IpcRendererEvent, remote,
+  ipcRenderer, IpcRendererEvent,
 } from 'electron'
+import { app as remoteApp, dialog as remoteDialog } from '@electron/remote'
 import { Vue, Component } from 'vue-property-decorator'
 import { State } from 'vuex-class'
 
@@ -42,8 +43,8 @@ export default class System extends Vue {
       if (data) {
         this.$message.success(this.$t('saved'))
         this.$bus.$emit('site-reload')
-        remote.app.relaunch()
-        remote.app.quit()
+        remoteApp.relaunch()
+        remoteApp.quit()
       } else {
         this.$message.error(this.$t('saveError'))
       }
@@ -51,7 +52,7 @@ export default class System extends Vue {
   }
 
   async handleFolderSelect() {
-    const res = await remote.dialog.showOpenDialog({
+    const res = await remoteDialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
     })
     if (res.filePaths.length > 0) {

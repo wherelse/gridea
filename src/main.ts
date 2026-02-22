@@ -6,7 +6,7 @@ import '@/assets/styles/main.less'
 import VueI18n from 'vue-i18n'
 import Prism from 'prismjs'
 import VueShortkey from 'vue-shortkey'
-import { remote } from 'electron'
+import { app as remoteApp } from '@electron/remote'
 import * as Sentry from '@sentry/electron'
 import locale from './assets/locales'
 import App from './App.vue'
@@ -26,7 +26,7 @@ const defaultLocale = ({
   'zh-CN': 'zhHans',
   'zh-TW': 'zh_TW',
   'en-US': 'en',
-} as any)[remote.app.getLocale() || 'zh-CN']
+} as any)[remoteApp.getLocale() || 'zh-CN']
 
 Vue.use(VueI18n)
 const i18n = new VueI18n({

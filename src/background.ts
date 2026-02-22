@@ -6,11 +6,14 @@ import {
 } from 'vue-cli-plugin-electron-builder/lib'
 import { autoUpdater } from 'electron-updater'
 import { init } from '@sentry/electron/dist/main'
+import { initialize as initRemote, enable as enableRemote } from '@electron/remote/main'
 import App from './server/app'
 import messages from './assets/locales-menu'
 import initServer from './server'
 
 init({ dsn: 'https://6a6dacc57a6a4e27a88eb31596c152f8@sentry.io/1887150' })
+
+initRemote()
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -32,7 +35,7 @@ function createWindow() {
     webPreferences: {
       webSecurity: false, // FIXED: Not allowed to load local resource
       nodeIntegration: true,
-      enableRemoteModule: true, // FIXED: 兼容 electron@11.0.1
+      contextIsolation: false, // Required for @electron/remote and nodeIntegration; was default in Electron <12
     },
     // frame: false, // 去除默认窗口栏
     titleBarStyle: 'hiddenInset' as ('hidden' | 'default' | 'hiddenInset' | 'customButtonsOnHover' | undefined),
@@ -43,6 +46,7 @@ function createWindow() {
   }
 
   win = new BrowserWindow(winOption)
+  enableRemote(win.webContents)
   win.setTitle('Gridea')
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
